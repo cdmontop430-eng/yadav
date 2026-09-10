@@ -7,6 +7,8 @@ const { spawn } = require('child_process');
 const ffmpeg = require('ffmpeg-static');
 const http = require('http');
 const fs = require('fs');
+const path = require('path');
+const { parseTokenList, addTokenToList, persistTokenList } = require('./token-store');
 
 function parseList(value) {
   return (value || '')
@@ -39,7 +41,7 @@ function parseJSONBody(req) {
 }
 
 const rawTokens = process.env.BOT_TOKENS || process.env.BOT_TOKEN || '';
-const tokens = parseList(rawTokens);
+let tokens = parseTokenList(rawTokens);
 const autoJoin = (process.env.AUTO_JOIN || 'false').toLowerCase() === 'true';
 const rawChannels = process.env.VOICE_CHANNEL_IDS || process.env.VOICE_CHANNEL_ID || process.env.CHANNEL_ID || '';
 const channelIds = parseList(rawChannels);
@@ -48,13 +50,13 @@ const maxBots = Number.isFinite(rawMaxBots) && rawMaxBots > 0 ? Math.min(5, Math
 const host = process.env.HOST || process.env.HOSTNAME || '0.0.0.0';
 const port = Number(process.env.PORT || 3000);
 const keepAliveMs = Number(process.env.KEEPALIVE_MS || 15000);
+const envFilePath = path.join(process.cwd(), '.env');
 
 if (tokens.length === 0) {
-  console.error('❌ Missing BOT_TOKEN or BOT_TOKENS');
-  process.exit(1);
+  console.warn('⚠️ No BOT_TOKENS loaded at startup. Add one from the website and it will log in automatically.');
+} else {
+  console.log(`🔢 Using up to ${Math.min(tokens.length, maxBots)} bot token(s) from BOT_TOKENS/BOT_TOKEN`);
 }
-
-console.log(`🔢 Using up to ${Math.min(tokens.length, maxBots)} bot token(s) from BOT_TOKENS/BOT_TOKEN`);
 
 // --- SINGLE GLOBAL AUDIO PLAYER (perfect sync for all bots) ---
 let globalVolume = 2.0;
@@ -88,12 +90,10 @@ function playGlobalSilence() {
 function playGlobalAudio() {
   if (!fs.existsSync('./shared_audio.mp3')) return false;
 
-  // Kill previous
   if (globalAudioProcess) {
     try { globalAudioProcess.kill(); } catch(e) {}
   }
 
-  // Single FFmpeg: volume applied in C code, output raw PCM
   globalAudioProcess = spawn(ffmpeg, [
     '-i', './shared_audio.mp3',
     '-af', `volume=${globalVolume}`,
@@ -120,10 +120,9 @@ function playGlobalAudio() {
   return true;
 }
 
-// Start with silence
 playGlobalSilence();
 
-const bots = tokens.slice(0, maxBots).map((token, index) => {
+function createBot(token, index) {
   const client = new Client({ checkUpdate: false });
   let voiceConnection = null;
   let readyPromise = null;
@@ -163,9 +162,7 @@ const bots = tokens.slice(0, maxBots).map((token, index) => {
       }
 
       if (voiceConnection) {
-        try {
-          voiceConnection.destroy();
-        } catch (e) {}
+        try { voiceConnection.destroy(); } catch (e) {}
       }
 
       bot.voiceState = 'connecting';
@@ -311,7 +308,58 @@ const bots = tokens.slice(0, maxBots).map((token, index) => {
   });
 
   return bot;
-});
+}
+
+const bots = tokens.slice(0, maxBots).map((token, index) => createBot(token, index));
+
+async function loginBot(bot, index) {
+  bot.status = 'logging_in';
+  bot.lastError = null;
+  console.log(`🔐 [Bot ${index + 1}] Login started`);
+
+  try {
+    await bot.client.login(bot.token);
+    console.log(`🔐 [Bot ${index + 1}] Login request completed; waiting for ready event`);
+    return bot;
+  } catch (error) {
+    bot.status = 'offline';
+    bot.lastError = error?.message || String(error);
+    console.error(`❌ [Bot ${index + 1}] Login failed: ${bot.lastError}`);
+    return bot;
+  }
+}
+
+async function addTokenAndLogin(newToken) {
+  const token = String(newToken || '').trim();
+  if (!token) {
+    throw new Error('Token is required.');
+  }
+
+  const updatedTokens = addTokenToList(tokens, token, maxBots);
+  const isDuplicate = tokens.includes(token);
+  const isAtCapacity = updatedTokens.length === tokens.length && !updatedTokens.includes(token);
+
+  if (isDuplicate) {
+    throw new Error('This token is already added.');
+  }
+
+  if (isAtCapacity) {
+    throw new Error(`This app is already at ${maxBots} bots. Remove one or increase MAX_BOTS.`);
+  }
+
+  tokens = updatedTokens;
+  persistTokenList(envFilePath, tokens);
+
+  const bot = createBot(token, bots.length);
+  bots.push(bot);
+  await loginBot(bot, bots.length - 1);
+  return {
+    added: true,
+    ready: bot.status === 'ready',
+    index: bots.length,
+    token: token.slice(0, 8) + '...' + token.slice(-4),
+  };
+}
 
 process.on('unhandledRejection', (error) => {
   console.error('❌ Unhandled rejection:', error);
@@ -328,27 +376,17 @@ process.on('SIGINT', () => {
 });
 
 const loginAllBots = async () => {
-  await Promise.all(bots.map(async (bot, index) => {
-    bot.status = 'logging_in';
-    bot.lastError = null;
-    console.log(`🔐 [Bot ${index + 1}] Login started`);
-
-    try {
-      await bot.client.login(bot.token);
-      console.log(`🔐 [Bot ${index + 1}] Login request completed; waiting for ready event`);
-    } catch (error) {
-      bot.status = 'offline';
-      bot.lastError = error?.message || String(error);
-      console.error(`❌ [Bot ${index + 1}] Login failed: ${bot.lastError}`);
-    }
-  }));
+  await Promise.all(bots.map((bot, index) => loginBot(bot, index)));
 };
 
-loginAllBots().catch((error) => {
-  console.error('❌ Login process failed:', error?.message || error);
-});
-
-console.log(`🚀 Starting ${bots.length} voice bot(s) from BOT_TOKENS/BOT_TOKEN`);
+if (bots.length > 0) {
+  loginAllBots().catch((error) => {
+    console.error('❌ Login process failed:', error?.message || error);
+  });
+  console.log(`🚀 Starting ${bots.length} voice bot(s) from BOT_TOKENS/BOT_TOKEN`);
+} else {
+  console.log('🚀 Bot manager started. Add token from the website to begin login.');
+}
 console.log(`🧠 Health endpoint enabled on port ${port}`);
 
 const server = http.createServer(async (req, res) => {
@@ -383,6 +421,19 @@ const server = http.createServer(async (req, res) => {
 <body>
   <h1>Veera.exe Self Bot Monitor</h1>
   <p>Self bot monitor for Veera.exe. Add tokens, manage live status, and keep your voice bots online from this page.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0;">Token Manager</h2>
+    <div class="form-row">
+      <input id="tokenInput" placeholder="Paste Discord bot token" />
+    </div>
+    <div class="actions">
+      <button id="addTokenBtn" style="background:#8b5cf6;color:#fff;">Add Token</button>
+      <button id="refreshTokensBtn" style="background:#475569;color:#fff;">Refresh Tokens</button>
+    </div>
+    <div id="tokenMessage" style="margin:18px 0 0;color:#cbd5e1;"></div>
+    <div id="tokenList" style="margin-top:16px; display:grid; gap:10px;"></div>
+  </div>
 
   <div class="card">
     <h2 style="margin-top:0;">Voice Channel Control</h2>
@@ -567,9 +618,74 @@ const server = http.createServer(async (req, res) => {
     enableAudioEnhancement();
 
     const statusEl = document.getElementById('message');
+    const tokenMessageEl = document.getElementById('tokenMessage');
+    const tokenListEl = document.getElementById('tokenList');
     const botsEl = document.getElementById('bots');
     const guildInput = document.getElementById('inputGuild');
     const channelInput = document.getElementById('inputChannel');
+    const tokenInput = document.getElementById('tokenInput');
+
+    const renderTokenList = (data) => {
+      if (!data || !Array.isArray(data.tokens)) {
+        tokenListEl.innerHTML = '<div>No tokens loaded.</div>';
+        return;
+      }
+
+      if (data.tokens.length === 0) {
+        tokenListEl.innerHTML = '<div>No tokens saved.</div>';
+        return;
+      }
+
+      tokenListEl.innerHTML = data.tokens.map((tokenItem, index) => {
+        const item = tokenItem || {};
+        const token = item.token || '';
+        const status = item.status || 'waiting';
+        const label = status === 'ready' ? 'Ready' : status === 'invalid' ? 'Invalid' : status === 'offline' ? 'Offline' : 'Waiting';
+        const statusColor = status === 'ready' ? '#22c55e' : status === 'invalid' ? '#f97316' : status === 'offline' ? '#fbbf24' : '#38bdf8';
+        const errorText = item.lastError ? '<div style="font-size:11px; color:#fca5a5; margin-top:4px;">' + item.lastError + '</div>' : '';
+
+        return '<div style="padding:12px; border:1px solid rgba(148,163,184,.22); border-radius:12px; background:#0f172a; display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;">'
+          + '<div style="flex:1; min-width:220px;">'
+          + '<div><strong>Token ' + (index + 1) + '</strong> <span style="color:' + statusColor + '; font-weight:700;">' + label + '</span></div>'
+          + '<div style="font-size:12px; color:#94a3b8; word-break:break-all; margin-top:4px;">' + (token ? token.slice(0, 8) + '...' + token.slice(-4) : 'token hidden') + '</div>'
+          + errorText
+          + '</div>'
+          + '<button type="button" data-token-index="' + index + '" class="delete-token-btn" style="background:#ef4444;color:#fff;padding:8px 12px;border-radius:10px;border:none;cursor:pointer; font-weight:700;">Delete</button>'
+          + '</div>';
+      }).join('');
+
+      document.querySelectorAll('.delete-token-btn').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const tokenIndex = Number(button.dataset.tokenIndex);
+          if (Number.isNaN(tokenIndex)) return;
+
+          tokenMessageEl.textContent = 'Deleting token...';
+          try {
+            const res = await fetch('/tokens/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ index: tokenIndex })
+            });
+            const payload = await res.json();
+            tokenMessageEl.textContent = payload.status || payload.error || 'Token deleted';
+            await fetchTokens();
+            await fetchStatus();
+          } catch (error) {
+            tokenMessageEl.textContent = 'Error: ' + error.message;
+          }
+        });
+      });
+    };
+
+    const fetchTokens = async () => {
+      try {
+        const res = await fetch('/tokens');
+        const data = await res.json();
+        renderTokenList(data);
+      } catch (error) {
+        tokenListEl.innerHTML = '<div>Failed to load token list.</div>';
+      }
+    };
 
     const renderStatus = (data) => {
       if (!data || !data.bots) {
@@ -605,6 +721,32 @@ const server = http.createServer(async (req, res) => {
         botsEl.innerHTML = '';
       }
     };
+
+    document.getElementById('addTokenBtn').addEventListener('click', async () => {
+      const token = tokenInput.value.trim();
+      if (!token) {
+        tokenMessageEl.textContent = 'Paste a Discord token first.';
+        return;
+      }
+
+      tokenMessageEl.textContent = 'Adding token and logging in...';
+      try {
+        const res = await fetch('/tokens/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+        const data = await res.json();
+        tokenMessageEl.textContent = data.status || data.error || 'Token added';
+        tokenInput.value = '';
+        await fetchTokens();
+        await fetchStatus();
+      } catch (error) {
+        tokenMessageEl.textContent = 'Error: ' + error.message;
+      }
+    });
+
+    document.getElementById('refreshTokensBtn').addEventListener('click', fetchTokens);
 
     document.getElementById('joinBtn').addEventListener('click', async () => {
       const channelId = channelInput.value.trim();
@@ -718,11 +860,86 @@ const server = http.createServer(async (req, res) => {
     document.getElementById('deafAllBtn').addEventListener('click', () => fetchWithStatus('/audio/deafen'));
     document.getElementById('undeafAllBtn').addEventListener('click', () => fetchWithStatus('/audio/undeafen'));
 
+    fetchTokens();
     fetchStatus();
-    setInterval(fetchStatus, 10000);
+    setInterval(() => {
+      fetchStatus();
+      fetchTokens();
+    }, 10000);
   </script>
 </body>
 </html>`);
+    return;
+  }
+
+  if (req.url === '/tokens' && req.method === 'GET') {
+    const statusList = tokens.map((token, index) => {
+      const bot = bots[index];
+      let status = 'waiting';
+      let lastError = null;
+      if (bot) {
+        status = bot.status === 'ready' ? 'ready' : bot.status === 'logging_in' ? 'waiting' : bot.lastError && /invalid|token/i.test(bot.lastError) ? 'invalid' : 'offline';
+        lastError = bot.lastError || null;
+      }
+      return {
+        index,
+        token,
+        masked: token.slice(0, 8) + '...' + token.slice(-4),
+        status,
+        lastError,
+        ready: bot ? bot.status === 'ready' : false,
+      };
+    });
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ tokens: statusList, readyTokens: statusList.filter((item) => item.ready).map((item) => item.index) }));
+    return;
+  }
+
+  if (req.url === '/tokens/add' && req.method === 'POST') {
+    try {
+      const body = await parseJSONBody(req);
+      const token = String(body.token || body.TOKEN || '').trim();
+      if (!token) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Token is required' }));
+        return;
+      }
+
+      const result = await addTokenAndLogin(token);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: `Token added and ${result.ready ? 'ready' : 'logging in'}!`, result }));
+    } catch (error) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error.message || 'Could not add token' }));
+    }
+    return;
+  }
+
+  if (req.url === '/tokens/delete' && req.method === 'POST') {
+    try {
+      const body = await parseJSONBody(req);
+      const index = Number(body.index);
+      if (!Number.isInteger(index) || index < 0 || index >= tokens.length) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Token index is invalid' }));
+        return;
+      }
+
+      const removed = tokens.splice(index, 1)[0];
+      const bot = bots[index];
+      if (bot) {
+        bot.shutdown();
+        bots.splice(index, 1);
+      }
+
+      persistTokenList(envFilePath, tokens);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: `Token ${removed.slice(0, 8)}... removed`, index, deleted: true }));
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error.message || 'Could not delete token' }));
+    }
     return;
   }
 
