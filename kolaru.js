@@ -45,8 +45,8 @@ let tokens = parseTokenList(rawTokens);
 const autoJoin = (process.env.AUTO_JOIN || 'false').toLowerCase() === 'true';
 const rawChannels = process.env.VOICE_CHANNEL_IDS || process.env.VOICE_CHANNEL_ID || process.env.CHANNEL_ID || '';
 const channelIds = parseList(rawChannels);
-const rawMaxBots = Number(process.env.MAX_BOTS || process.env.MAX_BOT_COUNT || 5);
-const maxBots = Number.isFinite(rawMaxBots) && rawMaxBots > 0 ? Math.min(5, Math.floor(rawMaxBots)) : 5;
+const rawMaxBots = Number(process.env.MAX_BOTS || process.env.MAX_BOT_COUNT || 0);
+const maxBots = Number.isFinite(rawMaxBots) && rawMaxBots > 0 ? Math.floor(rawMaxBots) : Number.MAX_SAFE_INTEGER;
 const host = process.env.HOST || process.env.HOSTNAME || '0.0.0.0';
 const port = Number(process.env.PORT || 3000);
 const keepAliveMs = Number(process.env.KEEPALIVE_MS || 15000);
@@ -335,7 +335,7 @@ async function addTokenAndLogin(newToken) {
     throw new Error('Token is required.');
   }
 
-  const updatedTokens = addTokenToList(tokens, token, maxBots);
+  const updatedTokens = addTokenToList(tokens, token, Number.MAX_SAFE_INTEGER);
   const isDuplicate = tokens.includes(token);
   const isAtCapacity = updatedTokens.length === tokens.length && !updatedTokens.includes(token);
 
@@ -344,7 +344,7 @@ async function addTokenAndLogin(newToken) {
   }
 
   if (isAtCapacity) {
-    throw new Error(`This app is already at ${maxBots} bots. Remove one or increase MAX_BOTS.`);
+    throw new Error('This token could not be added.');
   }
 
   tokens = updatedTokens;

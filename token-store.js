@@ -17,7 +17,7 @@ function parseTokenList(value) {
     .filter((item, index, array) => array.indexOf(item) === index);
 }
 
-function addTokenToList(existingTokens, newToken, maxBots = 5) {
+function addTokenToList(existingTokens, newToken, maxBots = Number.MAX_SAFE_INTEGER) {
   const list = parseTokenList(existingTokens);
   const token = String(newToken || '').trim();
 
@@ -29,7 +29,7 @@ function addTokenToList(existingTokens, newToken, maxBots = 5) {
     return list;
   }
 
-  if (maxBots && list.length >= maxBots) {
+  if (Number.isFinite(maxBots) && maxBots > 0 && list.length >= maxBots) {
     return list;
   }
 

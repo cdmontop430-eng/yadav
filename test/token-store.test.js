@@ -8,16 +8,19 @@ test('parseTokenList reads comma and newline separated tokens', () => {
   assert.deepEqual(tokens, ['abc', 'def', 'ghi', 'jkl']);
 });
 
-test('addTokenToList prevents duplicates and respects maxBots', () => {
+test('addTokenToList prevents duplicates and allows unlimited tokens by default', () => {
   const tokens = ['a', 'b'];
-  const result = addTokenToList(tokens, 'b', 2);
+  const result = addTokenToList(tokens, 'b');
   assert.deepEqual(result, ['a', 'b']);
 
-  const next = addTokenToList(tokens, 'c', 3);
+  const next = addTokenToList(tokens, 'c');
   assert.deepEqual(next, ['a', 'b', 'c']);
 
-  const overflow = addTokenToList(['a', 'b', 'c'], 'd', 3);
-  assert.deepEqual(overflow, ['a', 'b', 'c']);
+  const unlimited = addTokenToList(['a', 'b', 'c', 'd', 'e'], 'f');
+  assert.deepEqual(unlimited, ['a', 'b', 'c', 'd', 'e', 'f']);
+
+  const limited = addTokenToList(['a', 'b'], 'c', 2);
+  assert.deepEqual(limited, ['a', 'b']);
 });
 
 test('persistTokenList writes BOT_TOKENS using comma list', () => {
