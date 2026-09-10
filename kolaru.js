@@ -359,7 +359,7 @@ const server = http.createServer(async (req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Render Bot Monitor</title>
+  <title>Veera.exe Self Bot Monitor</title>
   <style>
     body { background:#0b1220; color:#e5e7eb; font-family:system-ui, sans-serif; margin:0; padding:24px; }
     h1 { margin:0 0 8px; font-size:clamp(2rem, 3vw, 2.75rem); }
@@ -381,8 +381,8 @@ const server = http.createServer(async (req, res) => {
   </style>
 </head>
 <body>
-  <h1>Render Bot Monitor</h1>
-  <p>Hosted bot panel for Render. Join bots into a voice channel from this page and keep them online even when your Electron app is closed.</p>
+  <h1>Veera.exe Self Bot Monitor</h1>
+  <p>Self bot monitor for Veera.exe. Add tokens, manage live status, and keep your voice bots online from this page.</p>
 
   <div class="card">
     <h2 style="margin-top:0;">Voice Channel Control</h2>
