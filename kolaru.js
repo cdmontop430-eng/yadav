@@ -317,7 +317,10 @@ function routesInUse(name) {
 }
 
 function currentFilter() {
-  return buildLoudnessFilter(loudness);
+  // Music volume is already applied by the mixer (including auto-gain).
+  // Applying it again here can turn AUDIO_VOLUME=1000 into 1000 dB and flatten
+  // the stream before the limiter.
+  return buildLoudnessFilter({ ...loudness, volume: 1 });
 }
 
 function stopBus(name) {

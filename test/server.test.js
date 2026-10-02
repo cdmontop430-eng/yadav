@@ -303,6 +303,7 @@ test('loudness controls drive the mixer and the ffmpeg chain', async () => {
   assert.equal(app.loudness.targetLufs, -9);
   assert.match(body.filter, /acompressor=/);
   assert.match(body.filter, /alimiter=/);
+  assert.doesNotMatch(body.filter, /^volume=/, 'music gain is applied only once in the mixer');
   // Normalisation lives in the mixer now, not in an ffmpeg loudnorm pass, so
   // the target turns the mixer's auto-gain on instead of appearing in the
   // filter string.
@@ -313,6 +314,7 @@ test('loudness controls drive the mixer and the ffmpeg chain', async () => {
   const legacy = await postJson('/audio/volume', { volume: 5 });
   assert.equal(legacy.status, 200);
   assert.equal(app.loudness.volume, 5);
+  assert.equal(app.buses.mix.mixer.sources.get('music').gain, 5);
 
   const off = await postJson('/audio/loudness', { drive: 0, limiter: false, targetLufs: null });
   assert.match(off.body.filter, /volume=|bass=|treble=/, 'the filter can still carry volume / tone even with the limiter off');

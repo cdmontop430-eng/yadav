@@ -332,9 +332,8 @@ function renderHomePage() {
 
     var renderChainSummary = function (loudness) {
       if (!loudness || loudness.volume === undefined) return;
-      el('chainState').textContent = 'limiter to -0.2 dBFS'
-        + (loudness.targetLufs ? ' · ' + loudness.targetLufs + ' LUFS' : '')
-        + (loudness.limiter === false ? ' · limiter off' : '');
+      el('chainState').textContent = (loudness.limiter === false ? 'limiter off' : 'limiter to -0.45 dBFS')
+        + (loudness.targetLufs ? ' · ' + loudness.targetLufs + ' LUFS' : '');
     };
 
     var renderStatus = function (data) {
