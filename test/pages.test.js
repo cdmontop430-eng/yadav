@@ -57,6 +57,10 @@ test('dashboard page ships valid inline JavaScript', () => {
   assert.doesNotMatch(html, /saveLoudness|pushLoudness/, 'no loudness saving from this page');
   assert.match(html, /id="chainState"/, 'the active chain is still reported');
   assert.match(html, /id="gainState"/, 'the live pre-gain is reported');
+  assert.match(html, /id="musicGainSlider"/, 'music gain can be adjusted with a slider');
+  assert.match(html, /id="musicGainInput"/, 'music gain accepts an exact multiplier');
+  assert.match(html, /id="musicGainReadout"/, 'the selected gain is visible');
+  assert.match(html, /post\('\/audio\/loudness', \{ volume: gain \}\)/, 'gain is saved to the shared loudness API');
   assert.match(html, /id="micLevelState"/, 'the mic input level is reported');
   assert.match(html, /id="flowState"/, 'the audio flow is traced on the page');
   assert.match(html, /id="audioFile"/, 'the player itself is untouched');
