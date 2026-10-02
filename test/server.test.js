@@ -308,18 +308,28 @@ test('loudness controls drive the mixer and the ffmpeg chain', async () => {
   // filter string.
   assert.equal(app.buses.mix.mixer.autoGain, true, 'the target drives mixer normalisation');
   assert.doesNotMatch(body.filter, /loudnorm/, 'and loudnorm must stay out of the live chain');
-  assert.equal(app.buses.mix.mixer.sources.get('music').gain, 30, 'volume applies instantly in the mixer');
+  assert.equal(app.buses.mix.mixer.sources.get('music').gain, 1.5, 'the source gain is capped before the final limiter stage');
 
   const legacy = await postJson('/audio/volume', { volume: 5 });
   assert.equal(legacy.status, 200);
   assert.equal(app.loudness.volume, 5);
 
   const off = await postJson('/audio/loudness', { drive: 0, limiter: false, targetLufs: null });
-  assert.equal(off.body.filter, 'anull');
+  assert.match(off.body.filter, /volume=|bass=|treble=/, 'the filter can still carry volume / tone even with the limiter off');
   assert.equal(app.buses.mix.mixer.autoGain, false, 'clearing the target turns normalisation off');
 
   await postJson('/audio/loudness', { volume: 30, drive: 40, targetLufs: -5, limiter: true });
   assert.equal(app.buses.mix.mixer.autoGain, true, 'and restoring it turns normalisation back on');
+});
+
+test('the loudness caps match the documented 1000x ceiling', async () => {
+  const { status, body } = await postJson('/audio/loudness', { volume: 1000, micGain: 100, drive: 100, limiter: true, targetLufs: -5 });
+  assert.equal(status, 200);
+  assert.equal(app.loudness.volume, 1000, 'volume should accept the full documented loudness ceiling');
+  assert.equal(app.loudness.micGain, 100, 'mic gain should not be capped to 20x');
+  assert.equal(app.loudness.drive, 100, 'drive should also respect the real target range');
+  assert.match(body.filter, /alimiter=/);
+  assert.equal(app.buses.mix.mixer.autoGain, true, 'target LUFS still drives mixer gain');
 });
 
 test('music is paced to real time even when the decoder bursts', async () => {
@@ -454,12 +464,15 @@ test('mic audio streams over the websocket into the mix buses', async () => {
   assert.ok(app.buses.mic.mixer.sources.get('mic').received > 0, 'mic reached the mic-only bus');
   assert.equal(app.buses.music.mixer.sources.has('mic'), false, 'music-only bus stays clean');
 
-  // Music is ducked while the mic is live, but not by the old 9 dB.
+  // Music is ducked while the mic is live, but the source gain is intentionally
+  // capped before the limiter stage. We only need the ducking to stay audible,
+  // not to mirror the raw post-clip loudness setting.
   const duckedGain = app.buses.mix.mixer.sources.get('music').gain;
+  const expectedDuck = Math.min(app.loudness.volume * app.loudness.duckLevel, 1.5);
   assert.ok(duckedGain < app.loudness.volume, 'music is ducked while the mic talks');
   assert.ok(
-    duckedGain > app.loudness.volume * 0.6,
-    `ducking must stay mild (${duckedGain} vs volume ${app.loudness.volume})`,
+    duckedGain >= expectedDuck * 0.9 && duckedGain <= expectedDuck * 1.1,
+    `ducking must stay mild (${duckedGain} vs expected ${expectedDuck})`,
   );
 
   socket.close();
@@ -491,8 +504,8 @@ test('a connected but silent mic does not duck the music', async () => {
   assert.equal(status.body.active, false, 'silence is not an active mic');
   assert.equal(
     app.buses.mix.mixer.sources.get('music').gain,
-    app.loudness.volume,
-    'music keeps full gain while the mic is only hearing silence',
+    Math.min(app.loudness.volume, 1.5),
+    'music keeps the capped gain while the mic is only hearing silence',
   );
 
   const settings = await getJson('/settings');

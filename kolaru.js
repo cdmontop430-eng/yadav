@@ -134,7 +134,9 @@ const ffmpegAvailable = ffmpegCommandUsable(ffmpegPath);
 const loudness = {
   // Keep the real output boost in the reference-file range: a dB-style volume
   // is used in the final ffmpeg stage and the limiter keeps it below 0 dBFS.
-  volume: clampNumber(process.env.AUDIO_VOLUME, 0.5, 60, 60),
+  // The true ceiling is still 0 dBFS, but the mixer/ffmpeg pipeline accepts
+  // values up to 1000x so quiet tracks can be driven to the limiter target.
+  volume: clampNumber(process.env.AUDIO_VOLUME, 0.5, 1000, 60),
   // Light touch only; see buildLoudnessFilter.
   drive: clampNumber(process.env.AUDIO_DRIVE, 0, 100, 30),
   bass: clampNumber(process.env.AUDIO_BASS, 0, 30, 30),
@@ -160,7 +162,7 @@ const loudness = {
   // the mic page was open. Ducking should be noticeable over speech without
   // making the music disappear.
   duckLevel: clampNumber(process.env.AUDIO_DUCK_LEVEL, 0, 1, 0.8),
-  micGain: clampNumber(process.env.MIC_GAIN, 0.1, 20, 6),
+  micGain: clampNumber(process.env.MIC_GAIN, 0.1, 100, 6),
 };
 
 const routing = {
@@ -1465,8 +1467,8 @@ const server = http.createServer(async (req, res) => {
       // otherwise dragging a slider restarts every bus.
       const filterBefore = currentFilter();
 
-      if (body.volume !== undefined) loudness.volume = clampNumber(body.volume, 0.5, 60, loudness.volume);
-      if (body.micGain !== undefined) loudness.micGain = clampNumber(body.micGain, 0.1, 20, loudness.micGain);
+      if (body.volume !== undefined) loudness.volume = clampNumber(body.volume, 0.5, 1000, loudness.volume);
+      if (body.micGain !== undefined) loudness.micGain = clampNumber(body.micGain, 0.1, 100, loudness.micGain);
       if (body.drive !== undefined) loudness.drive = clampNumber(body.drive, 0, 100, loudness.drive);
       if (body.bass !== undefined) loudness.bass = clampNumber(body.bass, 0, 30, loudness.bass);
       if (body.treble !== undefined) loudness.treble = clampNumber(body.treble, 0, 30, loudness.treble);

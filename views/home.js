@@ -93,7 +93,7 @@ function renderHomePage() {
     </div>
     <div class="control" style="margin-top:16px;">
       <label>Browser preview boost: <span id="previewBoostDisplay">6.0x</span></label>
-      <input type="range" id="previewBoost" min="1" max="20" step="0.5" value="6" />
+      <input type="range" id="previewBoost" min="1" max="100" step="0.5" value="6" />
     </div>
     <div class="actions" style="margin-top:10px;">
       <button id="previewLoudBtn" style="background:#f59e0b;color:#111827;">Preview Loud Audio</button>
@@ -121,7 +121,7 @@ function renderHomePage() {
     </div>
     <div class="control">
       <label>Enhancer output gain: <span id="enhancerGainDisplay">1.0x</span></label>
-      <input type="range" id="enhancerGain" min="0.1" max="20" step="0.1" value="1" />
+      <input type="range" id="enhancerGain" min="0.1" max="100" step="0.1" value="1" />
     </div>
     <div id="enhancerMessage" class="msg"></div>
   </div>

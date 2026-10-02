@@ -74,7 +74,7 @@ function renderMicRoutePage() {
     <h2>Server Mic Settings</h2>
     <div class="control">
       <label>Mic gain sent to Discord: <span id="micGainDisplay">6.0x</span></label>
-      <input type="range" id="micGain" min="0.1" max="20" step="0.1" value="6" />
+      <input type="range" id="micGain" min="0.1" max="100" step="0.1" value="6" />
       <div class="hint">Your level, relative to the music. Applied in float, then the same drive + limiter chain runs, so you can be louder than the track without clipping.</div>
     </div>
     <div class="control check">
