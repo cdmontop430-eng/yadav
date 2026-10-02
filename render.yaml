@@ -24,7 +24,7 @@ services:
       - key: AUDIO_VOLUME
         value: 1000
       - key: AUDIO_DRIVE
-        value: 30
+        value: 0
       - key: AUDIO_BASS
         value: 0
       - key: AUDIO_TREBLE

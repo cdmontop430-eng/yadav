@@ -330,23 +330,32 @@ test('the audio the gateway receives is at digital full scale', () => {
     const buf = fs.readFileSync(pcm);
     let peak = 0;
     let clipped = 0;
+    let squareSum = 0;
     const n = buf.length / 2;
     for (let i = 0; i < n; i++) {
-      const a = Math.abs(buf.readInt16LE(i * 2));
+      const sample = buf.readInt16LE(i * 2);
+      const a = Math.abs(sample);
+      squareSum += sample * sample;
       if (a > peak) peak = a;
       if (a >= 32767) clipped += 1;
     }
-    return { peak, clipped, samples: n };
+    return { peak, clipped, samples: n, rms: Math.sqrt(squareSum / n) };
   };
 
-  const base = buildLoudnessFilter({ volume: 12, drive: 20, limiter: true, targetLufs: -5 });
+  const base = buildLoudnessFilter({ volume: 12, drive: 0, limiter: true, targetLufs: -5 });
   const normal = delivered(normalised, base);
+  const compressed = delivered(normalised, buildLoudnessFilter({ volume: 12, drive: 20, limiter: true, targetLufs: -5 }));
   // Asking for 1000x, as "make it louder" usually means.
   const extreme = delivered(normalised, `volume=1000,${base}`);
 
   fs.rmSync(work, { recursive: true, force: true });
 
   assert.ok(normal, 'the encoder produced output');
+  assert.ok(compressed, 'the optional compressor chain produced output');
+  assert.ok(
+    normal.rms > compressed.rms,
+    `limiter-only default should deliver more average level than compression (${normal.rms.toFixed(0)} vs ${compressed.rms.toFixed(0)})`,
+  );
   // The mixer normalises to a 0.89 peak ceiling rather than driving to 0 dBFS.
   // That is deliberate: 0 dBFS is where Opus starts audibly crackling, and the
   // last fraction of a dB is not worth the distortion. It is still about -1 dBFS

@@ -134,8 +134,8 @@ const ffmpegAvailable = ffmpegCommandUsable(ffmpegPath);
 const loudness = {
   // Mixer-side source gain feeds the automatic peak normalizer below.
   volume: clampNumber(process.env.AUDIO_VOLUME, 0.5, 1000, 1000),
-  // Light touch only; see buildLoudnessFilter.
-  drive: clampNumber(process.env.AUDIO_DRIVE, 0, 100, 30),
+  // Off by default: the limiter-only path uses more of the available headroom.
+  drive: clampNumber(process.env.AUDIO_DRIVE, 0, 100, 0),
   bass: clampNumber(process.env.AUDIO_BASS, 0, 30, 0),
   treble: clampNumber(process.env.AUDIO_TREBLE, 0, 30, 0),
   limiter: (process.env.AUDIO_LIMITER || 'true').toLowerCase() !== 'false',
