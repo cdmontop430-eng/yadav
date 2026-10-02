@@ -60,10 +60,11 @@ keep using the `BOT_TOKENS` env var, which is written into the file once at star
 The mixer is 32-bit float and ffmpeg converts to Int16 only at the very end, so
 gain can never wrap before the chain sees it. The chain is:
 
-1. **Pre-gain** (`AUDIO_VOLUME`, default 12) — headroom into the chain
-2. **Drive** (`AUDIO_DRIVE`, default 20) — a light `acompressor`
-3. **Target LUFS** (`AUDIO_TARGET_LUFS`, default **−5**) — normalisation, in the mixer
-4. **Limiter** (`AUDIO_LIMITER`, on) — `alimiter` at 1.0, 0 dBFS
+1. **Mixer gain** (`AUDIO_VOLUME`, default 1000x) — feeds peak normalisation
+2. **Output preamp** (8x / 18 dB) — raises average loudness after normalisation
+3. **Drive** (`AUDIO_DRIVE`, default 30) — a light `acompressor`
+4. **Target LUFS** (`AUDIO_TARGET_LUFS`, default **−5**) — peak normalisation, in the mixer
+5. **Limiter** (`AUDIO_LIMITER`, on) — `alimiter` at 0.95, with headroom for Opus
 
 ### Why normalisation is not ffmpeg's loudnorm
 
@@ -116,9 +117,10 @@ output the voice gateway receives, not the float level before encoding:
 | 1000x | −5.0 | −1.6 dBFS | 0 |
 
 0 dBFS is digital full scale. Past it there is no "louder", only clipping, so
-`AUDIO_VOLUME=1000` is accepted but changes nothing: `loudnorm` measures the
-result and the target pins the level regardless. The test suite asserts this
-directly, so it cannot be "fixed" by turning the knob.
+`AUDIO_VOLUME` is mixer-side input gain; peak normalisation keeps it from
+causing clipping. The separate 8x output preamp raises average loudness, and the
+limiter catches peaks. Raising the mixer gain alone past its normalisation point
+does not make the delivered stream louder.
 
 **If it is still quiet, the loss is not in this chain.** Check, in order:
 

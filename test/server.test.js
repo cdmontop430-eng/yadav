@@ -303,7 +303,8 @@ test('loudness controls drive the mixer and the ffmpeg chain', async () => {
   assert.equal(app.loudness.targetLufs, -9);
   assert.match(body.filter, /acompressor=/);
   assert.match(body.filter, /alimiter=/);
-  assert.doesNotMatch(body.filter, /^volume=/, 'music gain is applied only once in the mixer');
+  assert.match(body.filter, /^volume=8\.000,bass=/, 'a controlled output preamp follows mixer normalization');
+  assert.doesNotMatch(body.filter, /volume=1000dB/, 'the mixer gain must never become a 1000 dB ffmpeg boost');
   // Normalisation lives in the mixer now, not in an ffmpeg loudnorm pass, so
   // the target turns the mixer's auto-gain on instead of appearing in the
   // filter string.

@@ -132,10 +132,7 @@ const tokenFileKey = (process.env.TOKEN_FILE_KEY || '').trim();
 const ffmpegAvailable = ffmpegCommandUsable(ffmpegPath);
 
 const loudness = {
-  // Keep the real output boost in the reference-file range: a dB-style volume
-  // is used in the final ffmpeg stage and the limiter keeps it below 0 dBFS.
-  // The true ceiling is still 0 dBFS, but the mixer/ffmpeg pipeline accepts
-  // values up to 1000x so quiet tracks can be driven to the limiter target.
+  // Mixer-side source gain feeds the automatic peak normalizer below.
   volume: clampNumber(process.env.AUDIO_VOLUME, 0.5, 1000, 1000),
   // Light touch only; see buildLoudnessFilter.
   drive: clampNumber(process.env.AUDIO_DRIVE, 0, 100, 30),
@@ -317,10 +314,10 @@ function routesInUse(name) {
 }
 
 function currentFilter() {
-  // Music volume is already applied by the mixer (including auto-gain).
-  // Applying it again here can turn AUDIO_VOLUME=1000 into 1000 dB and flatten
-  // the stream before the limiter.
-  return buildLoudnessFilter({ ...loudness, volume: 1 });
+  // A controlled 8x output preamp (18 dB) raises average loudness after mixer
+  // normalization; the final limiter catches peaks. Never forward the mixer
+  // gain here: AUDIO_VOLUME=1000 would mean 1000 dB in ffmpeg.
+  return buildLoudnessFilter({ ...loudness, volume: 8 });
 }
 
 function stopBus(name) {
