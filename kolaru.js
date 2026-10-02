@@ -314,10 +314,9 @@ function routesInUse(name) {
 }
 
 function currentFilter() {
-  // A controlled 8x output preamp (18 dB) raises average loudness after mixer
-  // normalization; the final limiter catches peaks. Never forward the mixer
-  // gain here: AUDIO_VOLUME=1000 would mean 1000 dB in ffmpeg.
-  return buildLoudnessFilter({ ...loudness, volume: 8 });
+  // 40 dB is a 100x output preamp after mixer normalization. The final limiter
+  // catches peaks; never forward the mixer gain here (1000 would mean 1000 dB).
+  return buildLoudnessFilter({ ...loudness, volume: 40 });
 }
 
 function stopBus(name) {
