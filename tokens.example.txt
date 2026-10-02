@@ -1,0 +1,8 @@
+# One Discord account token per line.
+# Blank lines and lines starting with #, ; or // are ignored.
+#
+# Copy this file to tokens.txt, paste your tokens in, then press
+# "Reload token file" on the dashboard. Saving the file is enough too:
+# the server watches it and logs new tokens in / removed tokens out.
+
+# paste-your-token-here

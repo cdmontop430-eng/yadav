@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: kolaru
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 10000
+      - key: TOKENS_FILE
+        value: tokens.txt
+      - key: TOKEN_FILE_KEY
+        sync: false
+      - key: MAX_BOTS
+        value: 0
+      - key: AUTO_JOIN
+        value: "false"
+      - key: AUDIO_VOLUME
+        value: 60
+      - key: AUDIO_DRIVE
+        value: 30
+      - key: AUDIO_BASS
+        value: 30
+      - key: AUDIO_TREBLE
+        value: 30
+      - key: AUDIO_LIMITER
+        value: "true"
+      # -5 is the loudest output ffmpeg will sustain without clipping; the mixer
+      # still normalises the source before the limiter, matching the reference ZIP.
+      - key: AUDIO_TARGET_LUFS
+        value: -5
+      - key: AUDIO_DUCK_MUSIC
+        value: "true"
+      - key: AUDIO_DUCK_LEVEL
+        value: 0.8
+      - key: MIC_GAIN
+        value: 6
+      - key: MIC_ROUTE_DEFAULT
+        value: mix
+
