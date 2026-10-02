@@ -257,7 +257,8 @@ class PcmMixer extends Readable {
 
 // ffmpeg filter chain applied after the mixer.
 //
-// Measured ceiling: with the limiter holding true peak at -0.2 dBFS this chain
+// Measured ceiling: keep a small headroom below digital full scale so the final
+// Int16 conversion and Discord's Opus encoder do not turn peaks into clipping.
 // measures -5.0 LUFS integrated, which is the loudest ffmpeg will produce
 // (loudnorm's own I range bottoms out at -5.0). The old chain also reached
 // -5.0 LUFS, so the extra acompressor bought nothing measurable while costing
@@ -311,14 +312,12 @@ function buildLoudnessFilter(options = {}) {
   // the running level from the very first block. The limiter then holds the
   // ceiling, so the result is the same level without the startup dead air.
   if (limiter) {
-    // limit=1.0 is 0 dBFS, digital full scale - the ceiling for anything
-    // downstream. Measured on the real s16le output the voice gateway receives:
-    // -0.17 dBFS peak with zero clipped samples, so there is nothing left to
-    // turn up. Raising pre-gain past this only clips.
+    // Keep the output below full scale to leave headroom for Int16 conversion
+    // and Discord's Opus encoder.
     // level=disabled stops alimiter renormalising the output back to 0 dB.
     // A short attack with a longer release catches transients and then lets
     // the level come back, instead of chattering on every peak.
-    parts.push('alimiter=limit=1.0:level=disabled:attack=1:release=40');
+    parts.push('alimiter=limit=0.95:level=disabled:attack=1:release=40');
   }
 
   return parts.length ? parts.join(',') : 'anull';

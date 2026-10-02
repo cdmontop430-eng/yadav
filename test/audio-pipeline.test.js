@@ -154,8 +154,8 @@ test('buildLoudnessFilter adds compression and limiting', () => {
   assert.match(boosted, /volume=1\.500/);
   assert.match(boosted, /^volume=1\.500,acompressor=/);
   assert.match(boosted, /acompressor=/);
-  // 1.0 is 0 dBFS: the measured ceiling of the s16le the gateway receives.
-  assert.match(boosted, /alimiter=limit=1\.0/);
+  // Leave headroom below 0 dBFS for the gateway's Int16/Opus conversion.
+  assert.match(boosted, /alimiter=limit=0\.95/);
   assert.match(boosted, /level=disabled/, 'the limit has to be respected, not auto-normalised');
 
   // loudnorm must not come back. It is an EBU R128 pass that measures before
@@ -224,7 +224,7 @@ test('reference-style dB loudness is allowed without clipping', () => {
   assert.match(boosted, /volume=60(?:\.0+)?dB|volume=1000(?:\.0+)?/);
   assert.match(boosted, /bass=g=30/);
   assert.match(boosted, /treble=g=30/);
-  assert.match(boosted, /alimiter=limit=1\.0/);
+  assert.match(boosted, /alimiter=limit=0\.95/);
 });
 
 test('drive is a light touch, not a crusher', () => {
