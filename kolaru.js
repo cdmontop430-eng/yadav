@@ -136,8 +136,8 @@ const loudness = {
   volume: clampNumber(process.env.AUDIO_VOLUME, 0.5, 1000, 1000),
   // Light touch only; see buildLoudnessFilter.
   drive: clampNumber(process.env.AUDIO_DRIVE, 0, 100, 30),
-  bass: clampNumber(process.env.AUDIO_BASS, 0, 30, 30),
-  treble: clampNumber(process.env.AUDIO_TREBLE, 0, 30, 30),
+  bass: clampNumber(process.env.AUDIO_BASS, 0, 30, 0),
+  treble: clampNumber(process.env.AUDIO_TREBLE, 0, 30, 0),
   limiter: (process.env.AUDIO_LIMITER || 'true').toLowerCase() !== 'false',
   // This is the setting that actually makes playback loud. Measured, a fixed
   // pre-gain cannot: once the source peak drops below the compressor threshold
@@ -314,9 +314,10 @@ function routesInUse(name) {
 }
 
 function currentFilter() {
-  // 40 dB is a 100x output preamp after mixer normalization. The final limiter
-  // catches peaks; never forward the mixer gain here (1000 would mean 1000 dB).
-  return buildLoudnessFilter({ ...loudness, volume: 40 });
+  // Keep a measured 8x output preamp after normalization. Large preamps and
+  // extreme default EQ only drive the limiter harder and flatten the audio.
+  // Never forward mixer gain here: AUDIO_VOLUME=1000 would mean 1000 dB.
+  return buildLoudnessFilter({ ...loudness, volume: 8 });
 }
 
 function stopBus(name) {

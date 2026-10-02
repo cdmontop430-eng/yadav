@@ -61,7 +61,7 @@ The mixer is 32-bit float and ffmpeg converts to Int16 only at the very end, so
 gain can never wrap before the chain sees it. The chain is:
 
 1. **Mixer gain** (`AUDIO_VOLUME`, default 1000x) — feeds peak normalisation
-2. **Output preamp** (100x / 40 dB) — raises average loudness after normalisation
+2. **Output preamp** (8x) — raises average loudness after normalisation
 3. **Drive** (`AUDIO_DRIVE`, default 30) — a light `acompressor`
 4. **Target LUFS** (`AUDIO_TARGET_LUFS`, default **−5**) — peak normalisation, in the mixer
 5. **Limiter** (`AUDIO_LIMITER`, on) — `alimiter` at 0.95, with headroom for Opus

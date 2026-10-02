@@ -26,9 +26,9 @@ services:
       - key: AUDIO_DRIVE
         value: 30
       - key: AUDIO_BASS
-        value: 30
+        value: 0
       - key: AUDIO_TREBLE
-        value: 30
+        value: 0
       - key: AUDIO_LIMITER
         value: "true"
       # -5 is the loudest output ffmpeg will sustain without clipping; the mixer
