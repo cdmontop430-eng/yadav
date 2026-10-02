@@ -136,7 +136,7 @@ const loudness = {
   // is used in the final ffmpeg stage and the limiter keeps it below 0 dBFS.
   // The true ceiling is still 0 dBFS, but the mixer/ffmpeg pipeline accepts
   // values up to 1000x so quiet tracks can be driven to the limiter target.
-  volume: clampNumber(process.env.AUDIO_VOLUME, 0.5, 1000, 60),
+  volume: clampNumber(process.env.AUDIO_VOLUME, 0.5, 1000, 1000),
   // Light touch only; see buildLoudnessFilter.
   drive: clampNumber(process.env.AUDIO_DRIVE, 0, 100, 30),
   bass: clampNumber(process.env.AUDIO_BASS, 0, 30, 30),
@@ -447,7 +447,7 @@ function isMicActive() {
 // the mixer is really doing.
 function currentMusicGain() {
   const ducked = isMicActive() && loudness.duckMusic;
-  return clampNumber(loudness.volume * (ducked ? loudness.duckLevel : 1), 0.5, 1.5, 1.5);
+  return clampNumber(loudness.volume * (ducked ? loudness.duckLevel : 1), 0.5, 1000, 1000);
 }
 
 function refreshGains() {

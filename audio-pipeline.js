@@ -278,7 +278,7 @@ function buildLoudnessFilter(options = {}) {
   // above ~1.5 are not a multiplier anymore; they are the dB level the whole
   // chain is aiming for, and the limiter still holds the final output below 0 dBFS.
   if (Number.isFinite(volume) && volume > 0 && volume !== 1) {
-    const safeVolume = clamp(volume, 0.1, 60);
+    const safeVolume = clamp(volume, 0.1, 1000);
     const filterVolume = safeVolume >= 20
       ? `volume=${Number(safeVolume).toFixed(0)}dB`
       : `volume=${Number(safeVolume).toFixed(3)}`;

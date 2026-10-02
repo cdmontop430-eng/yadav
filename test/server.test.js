@@ -308,7 +308,7 @@ test('loudness controls drive the mixer and the ffmpeg chain', async () => {
   // filter string.
   assert.equal(app.buses.mix.mixer.autoGain, true, 'the target drives mixer normalisation');
   assert.doesNotMatch(body.filter, /loudnorm/, 'and loudnorm must stay out of the live chain');
-  assert.equal(app.buses.mix.mixer.sources.get('music').gain, 1.5, 'the source gain is capped before the final limiter stage');
+  assert.equal(app.buses.mix.mixer.sources.get('music').gain, 30, 'volume applies instantly in the mixer');
 
   const legacy = await postJson('/audio/volume', { volume: 5 });
   assert.equal(legacy.status, 200);
@@ -464,15 +464,12 @@ test('mic audio streams over the websocket into the mix buses', async () => {
   assert.ok(app.buses.mic.mixer.sources.get('mic').received > 0, 'mic reached the mic-only bus');
   assert.equal(app.buses.music.mixer.sources.has('mic'), false, 'music-only bus stays clean');
 
-  // Music is ducked while the mic is live, but the source gain is intentionally
-  // capped before the limiter stage. We only need the ducking to stay audible,
-  // not to mirror the raw post-clip loudness setting.
+  // Music is ducked while the mic is live, but not by the old 9 dB.
   const duckedGain = app.buses.mix.mixer.sources.get('music').gain;
-  const expectedDuck = Math.min(app.loudness.volume * app.loudness.duckLevel, 1.5);
   assert.ok(duckedGain < app.loudness.volume, 'music is ducked while the mic talks');
   assert.ok(
-    duckedGain >= expectedDuck * 0.9 && duckedGain <= expectedDuck * 1.1,
-    `ducking must stay mild (${duckedGain} vs expected ${expectedDuck})`,
+    duckedGain > app.loudness.volume * 0.6,
+    `ducking must stay mild (${duckedGain} vs volume ${app.loudness.volume})`,
   );
 
   socket.close();
@@ -504,8 +501,8 @@ test('a connected but silent mic does not duck the music', async () => {
   assert.equal(status.body.active, false, 'silence is not an active mic');
   assert.equal(
     app.buses.mix.mixer.sources.get('music').gain,
-    Math.min(app.loudness.volume, 1.5),
-    'music keeps the capped gain while the mic is only hearing silence',
+    app.loudness.volume,
+    'music keeps full gain while the mic is only hearing silence',
   );
 
   const settings = await getJson('/settings');
