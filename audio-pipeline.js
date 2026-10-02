@@ -302,6 +302,11 @@ function buildLoudnessFilter(options = {}) {
     parts.push(`acompressor=threshold=${threshold.toFixed(4)}:ratio=${ratio.toFixed(2)}:attack=10:release=250:makeup=${makeup.toFixed(2)}:knee=8`);
   }
 
+  const masterGain = clamp(Number(options.masterGain) || 1, 1, 100);
+  if (masterGain !== 1) {
+    parts.push(`volume=${masterGain.toFixed(1)}`);
+  }
+
   // No loudnorm here. It is an EBU R128 pass, and on a live pipe it measures
   // before it emits: measured, the first audio byte was delayed 2.6 s, and
   // nothing at all reached the player for the first 2.6 s of every track. On a

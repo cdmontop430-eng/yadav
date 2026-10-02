@@ -23,6 +23,8 @@ services:
         value: "false"
       - key: AUDIO_VOLUME
         value: 1000
+      - key: AUDIO_OUTPUT_GAIN
+        value: 100
       - key: AUDIO_DRIVE
         value: 0
       - key: AUDIO_BASS

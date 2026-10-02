@@ -134,6 +134,8 @@ const ffmpegAvailable = ffmpegCommandUsable(ffmpegPath);
 const loudness = {
   // Mixer-side source gain feeds the automatic peak normalizer below.
   volume: clampNumber(process.env.AUDIO_VOLUME, 0.5, 1000, 1000),
+  // Applied after normalization, immediately before the output limiter.
+  outputGain: clampNumber(process.env.AUDIO_OUTPUT_GAIN, 1, 100, 100),
   // Off by default: the limiter-only path uses more of the available headroom.
   drive: clampNumber(process.env.AUDIO_DRIVE, 0, 100, 0),
   bass: clampNumber(process.env.AUDIO_BASS, 0, 30, 0),
@@ -314,10 +316,10 @@ function routesInUse(name) {
 }
 
 function currentFilter() {
-  // Keep a measured 8x output preamp after normalization. Large preamps and
-  // extreme default EQ only drive the limiter harder and flatten the audio.
+  // The fixed preamp establishes the baseline; user outputGain is applied after
+  // normalization and before the limiter, so it changes the delivered level.
   // Never forward mixer gain here: AUDIO_VOLUME=1000 would mean 1000 dB.
-  return buildLoudnessFilter({ ...loudness, volume: 8 });
+  return buildLoudnessFilter({ ...loudness, volume: 8, masterGain: loudness.outputGain });
 }
 
 function stopBus(name) {
@@ -1468,6 +1470,7 @@ const server = http.createServer(async (req, res) => {
       const filterBefore = currentFilter();
 
       if (body.volume !== undefined) loudness.volume = clampNumber(body.volume, 0.5, 1000, loudness.volume);
+      if (body.outputGain !== undefined) loudness.outputGain = clampNumber(body.outputGain, 1, 100, loudness.outputGain);
       if (body.micGain !== undefined) loudness.micGain = clampNumber(body.micGain, 0.1, 100, loudness.micGain);
       if (body.drive !== undefined) loudness.drive = clampNumber(body.drive, 0, 100, loudness.drive);
       if (body.bass !== undefined) loudness.bass = clampNumber(body.bass, 0, 30, loudness.bass);

@@ -83,12 +83,12 @@ function renderHomePage() {
     <div class="kv"><span>Audio flow</span><span id="flowState">-</span></div>
     <div class="kv"><span>Loudness chain</span><span id="chainState">-</span></div>
     <div class="control" style="margin-top:16px;">
-      <label for="musicGainSlider">Music input gain <span id="musicGainReadout">1000x</span></label>
-      <input type="range" id="musicGainSlider" min="0" max="1000" step="1" value="1000" aria-label="Music input gain, logarithmic scale" />
+      <label for="musicGainSlider">Output gain <span id="musicGainReadout">100x</span></label>
+      <input type="range" id="musicGainSlider" min="0" max="1000" step="1" value="1000" aria-label="Post-normalization output gain, logarithmic scale" />
       <div class="form-row" style="margin-top:8px;">
-        <input type="number" id="musicGainInput" min="0.5" max="1000" step="0.5" value="1000" aria-label="Music input gain multiplier" />
+        <input type="number" id="musicGainInput" min="1" max="100" step="0.5" value="100" aria-label="Post-normalization output gain multiplier" />
       </div>
-      <div class="hint">Input gain before normalization. The limiter still caps final output to prevent clipping.</div>
+      <div class="hint">Applied after normalization. Higher gain pushes more audio into the limiter and can increase distortion.</div>
       <div id="musicGainMessage" class="msg" role="status" aria-live="polite"></div>
     </div>
     <div class="form-row">
@@ -221,15 +221,15 @@ function renderHomePage() {
     var gainSaveTimer = null;
 
     var sliderToMusicGain = function (position) {
-      return 0.5 * Math.pow(2000, Number(position) / 1000);
+      return Math.pow(100, Number(position) / 1000);
     };
 
     var musicGainToSlider = function (gain) {
-      return Math.round(1000 * Math.log(Number(gain) / 0.5) / Math.log(2000));
+      return Math.round(1000 * Math.log(Number(gain)) / Math.log(100));
     };
 
     var renderMusicGain = function (value) {
-      var gain = Math.max(0.5, Math.min(1000, Number(value) || 0.5));
+      var gain = Math.max(1, Math.min(100, Number(value) || 1));
       musicGainSlider.value = String(musicGainToSlider(gain));
       musicGainInput.value = String(Number(gain.toFixed(1)));
       musicGainReadout.textContent = (gain >= 100 ? gain.toFixed(0) : gain.toFixed(1)) + 'x';
@@ -238,12 +238,12 @@ function renderHomePage() {
     var saveMusicGain = function (value) {
       var gain = Number(value);
       if (!Number.isFinite(gain)) return;
-      gain = Math.max(0.5, Math.min(1000, gain));
+      gain = Math.max(1, Math.min(100, gain));
       renderMusicGain(gain);
       musicGainMessage.textContent = 'Saving gain...';
-      post('/audio/loudness', { volume: gain }).then(function (data) {
+      post('/audio/loudness', { outputGain: gain }).then(function (data) {
         if (data.error) throw new Error(data.error);
-        renderMusicGain(data.settings.loudness.volume);
+        renderMusicGain(data.settings.loudness.outputGain);
         musicGainMessage.textContent = 'Gain saved for all music buses.';
       }).catch(function (error) {
         musicGainMessage.textContent = 'Could not save gain: ' + error.message;
@@ -370,7 +370,7 @@ function renderHomePage() {
       renderTokenFile(info);
       renderAudioState(info);
       renderChainSummary(loudness);
-      if (loudness.volume !== undefined) renderMusicGain(loudness.volume);
+      if (loudness.outputGain !== undefined) renderMusicGain(loudness.outputGain);
     };
 
     var renderChainSummary = function (loudness) {
@@ -451,7 +451,7 @@ function renderHomePage() {
 
     musicGainInput.addEventListener('input', function () {
       var gain = Number(musicGainInput.value);
-      if (!Number.isFinite(gain) || gain < 0.5 || gain > 1000) return;
+      if (!Number.isFinite(gain) || gain < 1 || gain > 100) return;
       musicGainReadout.textContent = (gain >= 100 ? gain.toFixed(0) : gain.toFixed(1)) + 'x';
       musicGainSlider.value = String(musicGainToSlider(gain));
     });

@@ -156,6 +156,8 @@ test('buildLoudnessFilter adds compression and limiting', () => {
   assert.match(boosted, /acompressor=/);
   // Leave headroom below 0 dBFS for the gateway's Int16/Opus conversion.
   assert.match(boosted, /alimiter=limit=0\.95/);
+  const masterBoost = buildLoudnessFilter({ volume: 8, masterGain: 4, limiter: true });
+  assert.match(masterBoost, /volume=8\.000,volume=4\.0,alimiter=/, 'master gain follows normalization and stays before the limiter');
   assert.match(boosted, /level=disabled/, 'the limit has to be respected, not auto-normalised');
 
   // loudnorm must not come back. It is an EBU R128 pass that measures before
@@ -344,6 +346,7 @@ test('the audio the gateway receives is at digital full scale', () => {
 
   const base = buildLoudnessFilter({ volume: 12, drive: 0, limiter: true, targetLufs: -5 });
   const normal = delivered(normalised, base);
+  const louder = delivered(normalised, buildLoudnessFilter({ volume: 12, drive: 0, masterGain: 100, limiter: true, targetLufs: -5 }));
   const compressed = delivered(normalised, buildLoudnessFilter({ volume: 12, drive: 20, limiter: true, targetLufs: -5 }));
   // Asking for 1000x, as "make it louder" usually means.
   const extreme = delivered(normalised, `volume=1000,${base}`);
@@ -351,7 +354,12 @@ test('the audio the gateway receives is at digital full scale', () => {
   fs.rmSync(work, { recursive: true, force: true });
 
   assert.ok(normal, 'the encoder produced output');
+  assert.ok(louder, 'the post-normalization gain chain produced output');
   assert.ok(compressed, 'the optional compressor chain produced output');
+  assert.ok(louder.rms > normal.rms, 'post-normalization gain must raise average delivered level');
+  assert.ok(louder.rms > normal.rms * 1.1, 'maximum output gain must raise average delivered loudness materially');
+  assert.ok(louder.peak <= 32768, 'the limiter must prevent the output gain from exceeding full scale');
+  assert.ok(louder.clipped / louder.samples < 0.001, 'maximum output gain must keep PCM clipping negligible');
   assert.ok(
     normal.rms > compressed.rms,
     `limiter-only default should deliver more average level than compression (${normal.rms.toFixed(0)} vs ${compressed.rms.toFixed(0)})`,

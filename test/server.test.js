@@ -296,14 +296,16 @@ test('dashboard, token file and mic routing pages render', async () => {
 });
 
 test('loudness controls drive the mixer and the ffmpeg chain', async () => {
-  const { status, body } = await postJson('/audio/loudness', { volume: 30, drive: 60, targetLufs: -9 });
+  const { status, body } = await postJson('/audio/loudness', { volume: 30, outputGain: 12, drive: 60, targetLufs: -9 });
   assert.equal(status, 200);
   assert.equal(app.loudness.volume, 30);
+  assert.equal(app.loudness.outputGain, 12);
   assert.equal(app.loudness.drive, 60);
   assert.equal(app.loudness.targetLufs, -9);
   assert.match(body.filter, /acompressor=/);
   assert.match(body.filter, /alimiter=/);
   assert.match(body.filter, /^volume=8\.000,acompressor=/, 'a controlled output preamp follows mixer normalization');
+  assert.match(body.filter, /volume=12\.0,alimiter=/, 'adjustable output gain is applied after normalization, before limiting');
   assert.doesNotMatch(body.filter, /bass=|treble=/, 'extreme EQ boosts are off by default');
   assert.doesNotMatch(body.filter, /volume=1000dB/, 'the mixer gain must never become a 1000 dB ffmpeg boost');
   // Normalisation lives in the mixer now, not in an ffmpeg loudnorm pass, so
@@ -326,10 +328,11 @@ test('loudness controls drive the mixer and the ffmpeg chain', async () => {
   assert.equal(app.buses.mix.mixer.autoGain, true, 'and restoring it turns normalisation back on');
 });
 
-test('the loudness caps match the documented 1000x ceiling', async () => {
-  const { status, body } = await postJson('/audio/loudness', { volume: 1000, micGain: 100, drive: 100, limiter: true, targetLufs: -5 });
+test('the loudness caps match the documented gain ceilings', async () => {
+  const { status, body } = await postJson('/audio/loudness', { volume: 1000, outputGain: 1000, micGain: 100, drive: 100, limiter: true, targetLufs: -5 });
   assert.equal(status, 200);
   assert.equal(app.loudness.volume, 1000, 'volume should accept the full documented loudness ceiling');
+  assert.equal(app.loudness.outputGain, 100, 'post-normalization gain is capped at the supported 100x maximum');
   assert.equal(app.loudness.micGain, 100, 'mic gain should not be capped to 20x');
   assert.equal(app.loudness.drive, 100, 'drive should also respect the real target range');
   assert.match(body.filter, /alimiter=/);

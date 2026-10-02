@@ -62,9 +62,10 @@ gain can never wrap before the chain sees it. The chain is:
 
 1. **Mixer gain** (`AUDIO_VOLUME`, default 1000x) — feeds peak normalisation
 2. **Output preamp** (8x) — raises average loudness after normalisation
-3. **Drive** (`AUDIO_DRIVE`, default 0) — optional compression; off by default to preserve output level
-4. **Target LUFS** (`AUDIO_TARGET_LUFS`, default **−5**) — peak normalisation, in the mixer
-5. **Limiter** (`AUDIO_LIMITER`, on) — `alimiter` at 0.95, with headroom for Opus
+3. **Output gain** (`AUDIO_OUTPUT_GAIN`, default 100x; adjustable 1–100x) — applied after normalisation and before the limiter
+4. **Drive** (`AUDIO_DRIVE`, default 0) — optional compression; off by default to preserve output level
+5. **Target LUFS** (`AUDIO_TARGET_LUFS`, default **−5**) — peak normalisation, in the mixer
+6. **Limiter** (`AUDIO_LIMITER`, on) — `alimiter` at 0.95, with headroom for Opus
 
 ### Why normalisation is not ffmpeg's loudnorm
 
@@ -86,6 +87,11 @@ knows the running level from the very first block. It tracks a slowly-moving
 peak and nudges the gain toward the ceiling, up to 1000x for a genuinely quiet
 file. By default, the ffmpeg chain uses the output preamp and limiter without
 the compressor; enabling `AUDIO_DRIVE` can reduce peaks and perceived loudness.
+`AUDIO_OUTPUT_GAIN` is the control that changes delivered level: unlike source
+gain, it runs after normalization and before the limiter. The Render default is
+100x for maximum output; sustained limiting can add distortion. The limiter's
+automatic level compensation stays disabled because it caused full-scale
+clipping in measured output.
 
 ### Why a target is needed at all
 
